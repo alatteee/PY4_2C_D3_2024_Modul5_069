@@ -10,45 +10,60 @@ import 'package:logbook_app_069/features/onboarding/onboarding_view.dart';
 import 'package:logbook_app_069/helpers/log_helper.dart';
 import 'package:logbook_app_069/services/mongo_service.dart';
 
+Future<void> _bootstrapBackground() async {
+  try {
+    // Init ini tidak boleh menahan rendering UI awal.
+    await dotenv.load(fileName: '.env');
+
+    Intl.defaultLocale = 'id_ID';
+    await initializeDateFormatting('id_ID', null);
+
+    // Koneksi cloud dijalankan setelah app sudah tampil.
+    await MongoService().connect();
+    await LogHelper.writeLog(
+      'Berhasil terhubung ke MongoDB',
+      source: 'main.dart',
+      level: 2,
+    );
+  } catch (e) {
+    await LogHelper.writeLog(
+      'Bootstrap background gagal (app tetap jalan offline): $e',
+      source: 'main.dart',
+      level: 1,
+    );
+  }
+}
+
 Future<void> main() async {
   // Wajib untuk operasi async sebelum runApp
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // 1. Load konfigurasi lingkungan dari file .env
-    await dotenv.load(fileName: ".env");
-    await LogHelper.writeLog(
-      "ENV berhasil dimuat",
-      source: "main.dart",
-      level: 2,
-    );
-
-    // 1b. Locale Indonesia untuk formatting timestamp
-    Intl.defaultLocale = 'id_ID';
-    await initializeDateFormatting('id_ID', null);
-
-    // 2. Inisialisasi Hive (Offline-First Local DB)
-    await Hive.initFlutter();
+  // 1) Inisialisasi Hive harus selalu berhasil agar offline mode tetap jalan.
+  await Hive.initFlutter();
+  if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(LogModelAdapter());
-    await Hive.openBox<LogModel>('offline_logs');
-
-    // 3. Lakukan handshake dengan MongoDB Atlas
-    await MongoService().connect();
-    await LogHelper.writeLog(
-      "Berhasil terhubung ke MongoDB",
-      source: "main.dart",
-      level: 2,
-    );
+  }
+  
+  // Coba buka box, jika error berarti data lama tidak kompatibel → hapus dan buat baru
+  try {
+    if (!Hive.isBoxOpen('offline_logs')) {
+      await Hive.openBox<LogModel>('offline_logs');
+    }
   } catch (e) {
-    // Kalau gagal, tetap jalankan aplikasi tapi log error-nya
-    await LogHelper.writeLog(
-      "Gagal inisialisasi MongoDB/ENV: $e",
-      source: "main.dart",
-      level: 1,
-    );
+    // Jika error saat membaca (misal: field lama tidak match), hapus box lama
+    try {
+      await Hive.deleteBoxFromDisk('offline_logs');
+      await Hive.openBox<LogModel>('offline_logs');
+    } catch (deleteError) {
+      // Fallback: lanjut tanpa Hive kalau truly stuck
+      print('Hive initialization failed: $deleteError');
+    }
   }
 
   runApp(const MyApp());
+
+  // Jangan await: biarkan UI muncul dulu, lalu bootstrap cloud di belakang.
+  _bootstrapBackground();
 }
 
 class MyApp extends StatelessWidget {

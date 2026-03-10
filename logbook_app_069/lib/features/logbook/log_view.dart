@@ -864,6 +864,13 @@ class _LogListSection extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
+                                    // Indikator Sinkronisasi
+                                    Icon(
+                                      log.isSynced ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                                      size: 16,
+                                      color: log.isSynced ? Colors.green[600] : Colors.grey[400],
+                                    ),
+                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 3),

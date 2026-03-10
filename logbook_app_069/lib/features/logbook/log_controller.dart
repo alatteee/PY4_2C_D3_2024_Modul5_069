@@ -53,12 +53,24 @@ class LogController {
     return null;
   }
 
-  Future<void> _replaceLocalTeamLogs(List<LogModel> cloudData) async {
+  Future<void> _replaceLocalTeamLogs(List<LogModel> cloudAndMergedData) async {
     final keysToDelete = <dynamic>[];
+    
+    // 1. Kumpulkan sidik jari data baru untuk pengecekan duplikasi
+    final newFingerprints = cloudAndMergedData.map((log) => 
+      '${log.authorId}-${log.teamId}-${log.date.toIso8601String()}-${log.title}'
+    ).toSet();
+
+    // 2. Tandai data lama di Hive yang merupakan bagian dari tim ini atau sidik jarinya duplikat
     for (final key in _myBox.keys) {
       final stored = _myBox.get(key);
-      if (stored != null && stored.teamId == teamId) {
-        keysToDelete.add(key);
+      if (stored != null) {
+        final storedFingerprint = '${stored.authorId}-${stored.teamId}-${stored.date.toIso8601String()}-${stored.title}';
+        
+        // Hapus jika timnya sama (clean sync) ATAU sidik jarinya ada di data baru (cegah duplikat atomik)
+        if (stored.teamId == teamId || newFingerprints.contains(storedFingerprint)) {
+          keysToDelete.add(key);
+        }
       }
     }
 
@@ -66,24 +78,30 @@ class LogController {
       await _myBox.deleteAll(keysToDelete);
     }
 
-    if (cloudData.isNotEmpty) {
-      await _myBox.addAll(cloudData);
+    // 3. Masukkan data hasil merge yang sudah bersih
+    if (cloudAndMergedData.isNotEmpty) {
+      await _myBox.addAll(cloudAndMergedData);
     }
   }
 
   List<LogModel> _mergeLogs(List<LogModel> localLogs, List<LogModel> cloudLogs) {
     final merged = <String, LogModel>{};
 
+    // 1. Masukkan data Cloud dulu (Prioritas kebenaran data)
     for (final log in cloudLogs) {
-      final key = log.idHex ??
-          '${log.authorId}-${log.teamId}-${log.date.toIso8601String()}-${log.title}';
-      merged[key] = log;
+      // Gunakan kombinasi atribut sebagai kunci unik yang stabil
+      final fingerprint = '${log.authorId}-${log.teamId}-${log.date.toIso8601String()}-${log.title}';
+      merged[fingerprint] = log;
     }
 
+    // 2. Masukkan data Lokal (Hanya timpa jika statusnya lebih baru/perlu sync)
     for (final log in localLogs) {
-      final key = log.idHex ??
-          '${log.authorId}-${log.teamId}-${log.date.toIso8601String()}-${log.title}';
-      merged[key] = log;
+      final fingerprint = '${log.authorId}-${log.teamId}-${log.date.toIso8601String()}-${log.title}';
+      
+      // Jika data lokal belum sinkron, dia "menang" untuk ditampilkan status cloud_off nya
+      if (!merged.containsKey(fingerprint) || !log.isSynced) {
+        merged[fingerprint] = log;
+      }
     }
 
     final result = merged.values.toList()
@@ -126,11 +144,12 @@ class LogController {
       category: category,
       authorId: userId,
       teamId: teamId,
+      isSynced: false, // Awalnya selalu false
     );
 
     try {
       // 1. Simpan ke Hive (instan)
-      await _myBox.add(newLog);
+      final boxKey = await _myBox.add(newLog);
 
       // 2. Update UI dari cache lokal
       final currentLogs = List<LogModel>.from(logsNotifier.value);
@@ -141,6 +160,20 @@ class LogController {
       // 3. Coba kirim ke MongoDB Atlas di background
       try {
         await MongoService().insertLog(newLog);
+
+        // Jika berhasil, update status sync di Hive
+        final syncedLog = newLog.copyWith(isSynced: true);
+        await _myBox.put(boxKey, syncedLog);
+
+        // Perbarui juga di UI
+        final logIndex = logsNotifier.value.indexWhere((log) => log.id == newLog.id);
+        if (logIndex != -1) {
+          final currentLogs = List<LogModel>.from(logsNotifier.value);
+          currentLogs[logIndex] = syncedLog;
+          logsNotifier.value = currentLogs;
+          _syncFilteredLogs();
+        }
+
         await LogHelper.writeLog(
           "SUCCESS: Data '${newLog.title}' tersinkron ke Cloud",
           source: "log_controller.dart",
@@ -199,6 +232,7 @@ class LogController {
       category: category,
       authorId: oldLog.authorId,
       teamId: oldLog.teamId,
+      isSynced: false, // Tandai sebagai belum sinkron saat diedit
     );
 
     try {
@@ -218,6 +252,22 @@ class LogController {
       // 3. Sync ke MongoDB di background
       try {
         await MongoService().updateLog(updatedLog);
+
+        // Jika berhasil, update status sync di Hive
+        final syncedLog = updatedLog.copyWith(isSynced: true);
+        if (boxKey != null) {
+          await _myBox.put(boxKey, syncedLog);
+        }
+
+        // Perbarui juga di UI
+        final logIndex = logsNotifier.value.indexWhere((log) => log.id == updatedLog.id);
+        if (logIndex != -1) {
+          final currentLogs = List<LogModel>.from(logsNotifier.value);
+          currentLogs[logIndex] = syncedLog;
+          logsNotifier.value = currentLogs;
+          _syncFilteredLogs();
+        }
+
         await LogHelper.writeLog(
           "SUCCESS: Sinkronisasi Update '${oldLog.title}' Berhasil",
           source: "log_controller.dart",

@@ -33,6 +33,10 @@ class LogModel {
   @HiveField(6)
   final String category;
 
+  // Status sinkronisasi untuk UI
+  @HiveField(7)
+  final bool isSynced;
+
   LogModel({
     ObjectId? id,
     required this.title,
@@ -41,6 +45,7 @@ class LogModel {
     this.category = 'Pribadi',
     this.authorId = 'unknown_user',
     this.teamId = 'no_team',
+    this.isSynced = false,
   }) : idHex = id?.toHexString();
 
   // [CONVERT] Untuk MongoDB: memasukkan data ke "kardus" (BSON/Map)
@@ -53,6 +58,7 @@ class LogModel {
       'category': category,
       'authorId': authorId,
       'teamId': teamId,
+      // isSynced tidak perlu disimpan di MongoDB
     };
   }
 
@@ -77,6 +83,30 @@ class LogModel {
       category: map['category'] ?? 'Pribadi',
       authorId: map['authorId'] ?? 'unknown_user',
       teamId: map['teamId'] ?? 'no_team',
+      isSynced: true, // Data dari cloud selalu dianggap sudah sinkron
+    );
+  }
+
+  // Salin objek dengan beberapa perubahan
+  LogModel copyWith({
+    ObjectId? id,
+    String? title,
+    String? description,
+    DateTime? date,
+    String? category,
+    String? authorId,
+    String? teamId,
+    bool? isSynced,
+  }) {
+    return LogModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      category: category ?? this.category,
+      authorId: authorId ?? this.authorId,
+      teamId: teamId ?? this.teamId,
+      isSynced: isSynced ?? this.isSynced,
     );
   }
 
@@ -93,6 +123,7 @@ class LogModel {
       'category': category,
       'authorId': authorId,
       'teamId': teamId,
+      'isSynced': isSynced,
     };
   }
 
@@ -118,6 +149,7 @@ class LogModel {
       category: map['category'] ?? 'Pribadi',
       authorId: map['authorId'] ?? 'unknown_user',
       teamId: map['teamId'] ?? 'no_team',
+      isSynced: map['isSynced'] ?? false,
     );
   }
 }
