@@ -387,6 +387,22 @@ class _CounterViewState extends State<CounterView> {
           ValueListenableBuilder<List<LogModel>>(
             valueListenable: _controller.logsNotifier,
             builder: (context, logs, _) {
+              final currentUser = _currentUser();
+              final currentUserId = currentUser['uid']!;
+
+              // Filter + deduplikasi berdasarkan fingerprint
+              final Map<String, LogModel> visibleMap = {};
+              for (final log in logs) {
+                if (log.authorId == currentUserId || log.isPublic == true) {
+                  final fp =
+                      '${log.authorId}-${log.teamId}-${log.title}-${log.description}';
+                  final existing = visibleMap[fp];
+                  if (existing == null || (!log.isSynced && existing.isSynced)) {
+                    visibleMap[fp] = log;
+                  }
+                }
+              }
+              final visibleLogs = visibleMap.values.toList();
               return Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -437,7 +453,7 @@ class _CounterViewState extends State<CounterView> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            "${logs.length} catatan tersimpan",
+                            "${visibleLogs.length} catatan tersimpan",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -718,15 +734,31 @@ class _LogListSection extends StatelessWidget {
         return ValueListenableBuilder<List<LogModel>>(
           valueListenable: state._controller.filteredLogs,
           builder: (context, currentLogs, child) {
+            final currentUserId = state.widget.username;
+
+            // Filter + deduplikasi berdasarkan fingerprint (author+team+date+title)
+            final Map<String, LogModel> displayMap = {};
+            for (final log in currentLogs) {
+              if (log.authorId == currentUserId || log.isPublic == true) {
+                final fp =
+                    '${log.authorId}-${log.teamId}-${log.title}-${log.description}';
+                final existing = displayMap[fp];
+                if (existing == null || (!log.isSynced && existing.isSynced)) {
+                  displayMap[fp] = log;
+                }
+              }
+            }
+            final displayLogs = displayMap.values.toList()
+              ..sort((a, b) => b.date.compareTo(a.date));
             return RefreshIndicator(
               color: kPrimary,
               onRefresh: state._refreshLogsAsync,
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                itemCount: currentLogs.length,
+                itemCount: displayLogs.length,
                 itemBuilder: (context, index) {
-                  final log = currentLogs[index];
+                  final log = displayLogs[index];
             final cat = _catLookup(log.category);
             final color = cat['color'] as Color;
             final actualIndex = state._controller.logsNotifier.value.indexWhere(

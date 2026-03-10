@@ -37,6 +37,11 @@ class LogModel {
   @HiveField(7)
   final bool isSynced;
 
+  // Status visibilitas: default PRIVATE (false)
+  // Jika true, catatan bisa dilihat anggota tim lain.
+  @HiveField(8)
+  final bool isPublic;
+
   LogModel({
     ObjectId? id,
     required this.title,
@@ -46,6 +51,7 @@ class LogModel {
     this.authorId = 'unknown_user',
     this.teamId = 'no_team',
     this.isSynced = false,
+    this.isPublic = false,
   }) : idHex = id?.toHexString();
 
   // [CONVERT] Untuk MongoDB: memasukkan data ke "kardus" (BSON/Map)
@@ -58,6 +64,7 @@ class LogModel {
       'category': category,
       'authorId': authorId,
       'teamId': teamId,
+      'isPublic': isPublic,
       // isSynced tidak perlu disimpan di MongoDB
     };
   }
@@ -83,6 +90,7 @@ class LogModel {
       category: map['category'] ?? 'Pribadi',
       authorId: map['authorId'] ?? 'unknown_user',
       teamId: map['teamId'] ?? 'no_team',
+      isPublic: (map['isPublic'] as bool?) ?? false,
       isSynced: true, // Data dari cloud selalu dianggap sudah sinkron
     );
   }
@@ -97,6 +105,7 @@ class LogModel {
     String? authorId,
     String? teamId,
     bool? isSynced,
+    bool? isPublic,
   }) {
     return LogModel(
       id: id ?? this.id,
@@ -107,6 +116,7 @@ class LogModel {
       authorId: authorId ?? this.authorId,
       teamId: teamId ?? this.teamId,
       isSynced: isSynced ?? this.isSynced,
+      isPublic: isPublic ?? this.isPublic,
     );
   }
 
@@ -124,6 +134,7 @@ class LogModel {
       'authorId': authorId,
       'teamId': teamId,
       'isSynced': isSynced,
+      'isPublic': isPublic,
     };
   }
 
@@ -149,6 +160,7 @@ class LogModel {
       category: map['category'] ?? 'Pribadi',
       authorId: map['authorId'] ?? 'unknown_user',
       teamId: map['teamId'] ?? 'no_team',
+      isPublic: (map['isPublic'] as bool?) ?? false,
       isSynced: map['isSynced'] ?? false,
     );
   }

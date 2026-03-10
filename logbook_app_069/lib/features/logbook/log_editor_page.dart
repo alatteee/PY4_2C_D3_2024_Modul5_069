@@ -26,6 +26,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
   late TextEditingController _descController;
   late String _selectedCategory;
   bool _isSaving = false;
+  bool _isPublic = false;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
       text: widget.log?.description ?? '',
     );
     _selectedCategory = widget.log?.category ?? 'Pribadi';
+    _isPublic = widget.log?.isPublic ?? false;
 
     // TAMBAHKAN INI: Listener agar Pratinjau terupdate otomatis
     _descController.addListener(() {
@@ -66,6 +68,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
         title,
         description,
         _selectedCategory,
+        _isPublic,
       );
     } else {
       success = await widget.controller.updateLog(
@@ -73,6 +76,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
         title,
         description,
         _selectedCategory,
+        _isPublic,
       );
     }
 
@@ -159,6 +163,18 @@ class _LogEditorPageState extends State<LogEditorPage> {
                       if (value != null) {
                         setState(() => _selectedCategory = value);
                       }
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Jadikan catatan Publik'),
+                    subtitle: const Text(
+                      'Jika Publik, anggota tim & ketua bisa melihat catatan ini.',
+                    ),
+                    value: _isPublic,
+                    onChanged: (value) {
+                      setState(() => _isPublic = value);
                     },
                   ),
                   const SizedBox(height: 10),

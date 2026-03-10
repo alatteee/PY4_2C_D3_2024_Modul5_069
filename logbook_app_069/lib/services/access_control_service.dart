@@ -34,27 +34,18 @@ class AccessControlService {
 
 	/// Validasi izin untuk mengedit (update).
 	static bool canUpdate(String role, {bool isOwner = false}) {
-		// Ketua bisa edit semua.
-		if (role == 'Ketua') return true;
-
-		// Anggota hanya bisa edit miliknya sendiri.
-		if (role == 'Anggota') return isOwner;
-
-		// Role lain (misal: Asisten) bisa edit sesuai _rolePermissions.
-		final permissions = _rolePermissions[role] ?? [];
-		return permissions.contains(actionUpdate);
+		// Task 5: Kedaulatan data
+		// HANYA pemilik catatan yang boleh mengedit,
+		// terlepas dari role apa pun (Ketua/Anggota/Asisten).
+		return isOwner;
 	}
 
 	/// Validasi izin untuk menghapus (delete).
 	static bool canDelete(String role, {bool isOwner = false}) {
-		// Ketua bisa hapus semua.
-		if (role == 'Ketua') return true;
-
-		// Anggota hanya bisa hapus miliknya sendiri.
-		if (role == 'Anggota') return isOwner;
-
-		// Role lain tidak diizinkan menghapus secara default.
-		return false;
+		// Task 5: Kedaulatan data
+		// HANYA pemilik catatan yang boleh menghapus,
+		// role tidak memberikan hak istimewa.
+		return isOwner;
 	}
 }
 

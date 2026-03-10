@@ -135,7 +135,7 @@ class LogController {
   }
 
   /// CREATE: Simpan lokal dulu, lalu sync ke Cloud di background.
-  Future<bool> addLog(String title, String desc, String category) async {
+  Future<bool> addLog(String title, String desc, String category, bool isPublic) async {
     final newLog = LogModel(
       id: ObjectId(),
       title: title,
@@ -145,6 +145,7 @@ class LogController {
       authorId: userId,
       teamId: teamId,
       isSynced: false, // Awalnya selalu false
+      isPublic: isPublic,
     );
 
     try {
@@ -204,7 +205,7 @@ class LogController {
   }
 
   /// UPDATE: Simpan perubahan ke Hive dulu, lalu sync ke Cloud.
-  Future<bool> updateLog(int index, String title, String desc, String category) async {
+  Future<bool> updateLog(int index, String title, String desc, String category, bool isPublic) async {
     final currentLogs = List<LogModel>.from(logsNotifier.value);
     final oldLog = currentLogs[index];
 
@@ -233,6 +234,7 @@ class LogController {
       authorId: oldLog.authorId,
       teamId: oldLog.teamId,
       isSynced: false, // Tandai sebagai belum sinkron saat diedit
+      isPublic: isPublic,
     );
 
     try {
