@@ -9,6 +9,7 @@ import 'package:logbook_app_069/features/logbook/models/log_model.dart';
 import 'package:logbook_app_069/features/onboarding/onboarding_view.dart';
 import 'package:logbook_app_069/helpers/log_helper.dart';
 import 'package:logbook_app_069/services/mongo_service.dart';
+import 'package:logbook_app_069/services/preferences_service.dart';
 
 Future<void> _bootstrapBackground() async {
   try {
@@ -59,6 +60,9 @@ Future<void> main() async {
       print('Hive initialization failed: $deleteError');
     }
   }
+
+  // 2) Inisialisasi SharedPreferences untuk menyimpan user preferences
+  await PreferencesService.initialize();
 
   runApp(const MyApp());
 

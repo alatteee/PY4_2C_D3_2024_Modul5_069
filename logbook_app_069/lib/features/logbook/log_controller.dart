@@ -110,11 +110,22 @@ class LogController {
   }
 
   Future<void> _syncPendingLocalLogs(List<LogModel> localLogs) async {
-    for (final log in localLogs) {
-      try {
-        await MongoService().updateLog(log);
-      } catch (_) {
-        // Biarkan log tetap di cache lokal; akan dicoba lagi saat online.
+    for (int i = 0; i < localLogs.length; i++) {
+      final log = localLogs[i];
+      if (!log.isSynced) {
+        try {
+          await MongoService().updateLog(log);
+          // Berhasil sinkron, tandai agar tidak menimpa data cloud dengan yang belum sinkron
+          final syncedLog = log.copyWith(isSynced: true);
+          localLogs[i] = syncedLog;
+          
+          final boxKey = _findBoxKeyForLog(log);
+          if (boxKey != null) {
+            await _myBox.put(boxKey, syncedLog);
+          }
+        } catch (_) {
+          // Biarkan log tetap di cache lokal; akan dicoba lagi saat online.
+        }
       }
     }
   }
@@ -125,7 +136,9 @@ class LogController {
       filteredLogs.value = logsNotifier.value;
     } else {
       filteredLogs.value = logsNotifier.value
-          .where((log) => log.title.toLowerCase().contains(query.toLowerCase()))
+          .where((log) =>
+              log.title.toLowerCase().contains(query.toLowerCase()) ||
+              log.description.toLowerCase().contains(query.toLowerCase()))
           .toList();
     }
   }
